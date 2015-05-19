@@ -3,10 +3,6 @@
 Scripts for performing phylogenetic analyses of whole genome sequences.
 
 ###USAGE
-Count-kmers.sh -- Shell script that uses Jellyfish for k-mer counting. Input is a genome fasta file and the output will be a sorted text file listing the abundance of all 18-mers that were found.
+Make_kmer_tables.pl -- A perl script that uses jellyfish to count kmers for a list of genomes and output sorted tables that can easily be imported into R for analysis.
 
-Glue-counts.pl -- A perl script to make a table from the jellyfish outputfile.
-
-Create-trees.pl -- A perl script to take the table generated from Glue-counts and create a distance matrix followed by a phylogenetic tree.
-
-Kmer-trees.pl -- A perl script that will do all of the above three scripts when I get everything sorted.
+Useage: Make_kmer_tables.pl --input file_list.txt --kmer 24 --outdir 24mer_tables
