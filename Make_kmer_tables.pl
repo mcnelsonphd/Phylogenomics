@@ -16,50 +16,83 @@
 ######################################################################################################
 
 use strict;
-use warnings;
+#use warnings;
 use FindBin;
 use File::Copy;
 use Time::Piece;
 use Time::Seconds;
+use Getopt::Long;
+use Scalar::Util qw(openhandle);
 
 ###### Initial variable instancing ######
 my $kmer = 12;
 my $outdir;
-
-
+my $input;
+my $logfile;
+my $cpus = 4;
 my $starttime = localtime;
 my $fp = find_exe("jellyfish");
 err("Can't find Jellyfish in your \$PATH") if !$fp;
 
-my(@Options, $cpus, $listdb, $citation);
+my @Options;
 setOptions();
 
-msg("Began running Make_kmer_tables.pl at $starttime");
-
-my $num_cores = num_cpu();
-msg("System has $num_cores cores.");
-if (!defined $cpus or $cpus < 0) {
-    $cpus = 1;
+if ($outdir) {
+    if (-d $outdir){
+        err("Output directory already exists, choose a new name for --outdir that is not $outdir");
+    }
+    else {
+        msg("Creating $outdir to put results into.");
+        runcmd("mkdir -p \Q$outdir\E")
+    }
+    $logfile = "$outdir/$kmer\mer_tables.log";    
 }
-elsif ($cpus == 0) {
-    $cpus = $num_cores;
+else {
+    $logfile = "$kmer\mer_tables.log";
 }
-elsif ($cpus > $num_cores) {
-    msg("Option --cpu asked for $cpus cores, but system only has $num_cores");
-    $cpus = $num_cores;
-}
-msg("Will use maximum of $cpus cores.");
-
-my $logfile = "$outdir/$kmer\_tables.log";
-msg("Writing log to: $logfile");
 open LOG, '>', $logfile or err("Can't open logfile");
+msg("Began running Make_kmer_tables.pl at $starttime");
+msg("Will use maximum of $cpus cores.");
+msg("Writing log to: $logfile");
 
 
 ###### ACTUAL WORK GETS DONE HERE ######
 
-my $infile = open
+if ($input == '') {
+    usage();
+}
+open(IN, $input) or msg("Could not open input file.\n");
+msg("Using $input as the input file.");
 
+while (<IN>) {
+    my @line = split(/\t/, $_);
+    my $genomeID = $line[0];
+    my $genomeFP = $line[1];
+    msg("Processing genome $genomeID using the file $genomeFP");
+    if ($outdir) {
+        runcmd("jellyfish count -t $cpus -m $kmer -o $outdir/$genomeID.jf -s 7000000 $genomeFP");
+        runcmd("jellyfish dump -t -c $outdir/$genomeID.jf | sort > $outdir/$genomeID.tmp");
+        open(OUT, ">$outdir/head.tmp") or die;
+        print OUT "kmer\t$genomeID\n";
+        close OUT;
+        runcmd("cat $outdir/head.tmp $outdir/$genomeID.tmp > $outdir/$genomeID\_$kmer\mers.txt");
+        unlink("$outdir/head.tmp", "$outdir/$genomeID.jf", "$outdir/$genomeID.tmp");
+    }
+    else {
+        runcmd("jellyfish count -t $cpus -m $kmer -o $genomeID.jf -s 7000000 $genomeFP");
+        runcmd("jellyfish dump -t -c $genomeID.jf | sort > $genomeID.tmp");
+        open(OUT, ">head.tmp") or die;
+        print OUT "kmer\t$genomeID\n";
+        close OUT;
+        runcmd("cat head.tmp $genomeID.tmp > $genomeID\_$kmer\mers.txt");
+        unlink("head.tmp", "$genomeID.jf", "$genomeID.tmp");
+    }
+}
 
+my $endtime = localtime;
+my $walltime = $endtime - $starttime;
+my $pretty = sprintf "%.2f minutes", $walltime->minutes;
+msg("Finished processing. Total time taken was: $pretty");
 
 ###### Sub-routines ######
 sub find_exe {
@@ -72,7 +105,6 @@ sub find_exe {
 }
 
 sub runcmd {
-    msg("Running:", @_);
     system(@_)==0 or err("Could not run command:", @_);
 }
 
@@ -80,18 +112,24 @@ sub msg {
     my $t = localtime;
     my $line = "[".$t->hms."] @_\n";
     print LOG $line if openhandle(\*LOG);
+    print STDERR $line;
+}
+
+sub err {
+  msg(@_);
+  exit(2);
 }
 
 sub setOptions {
-    use Getopt::Long;
     @Options = (
     'Mandatory:',
-    {OPT=>"input=s", VAR=>\&infile, DESC=>"The input table of GenomeID:filepaths to use for analysis"},
+    {OPT=>"input=s", VAR=>\$input, DESC=>"The input table of GenomeID:filepaths to use for analysis"},
     'Options:',
-    {OPT=>"kmer=i", VAR=>\&kmer, DESC=>"The kmer to use for analysis [DEFAULT=$kmer]"},
+    {OPT=>"kmer=i", VAR=>\$kmer, DESC=>"The kmer to use for analysis [DEFAULT=$kmer]"},
     {OPT=>"outdir=s", VAR=>\$outdir, DEFAULT=>'', DESC=>"Output folder"},
+    {OPT=>"cpus=i", VAR=>\$cpus, DESC=>"Numer of CPUs to use for counting. [DEFAULT=$cpus]"},
     'Help:',
-    {OPT=>"help", VAR=>\&usage, DESC=>"This help"},
+    {OPT=>"help", VAR=>\&usage, DESC=>"Print this help message."},
     );
     
     (!@ARGV) && (usage());
@@ -108,8 +146,8 @@ sub setOptions {
 
 sub usage {
     print STDERR
-    "\nMake_kmer_tables.pl: A jellyfish wrapper for creating kmer tables for genome sequences.\n",
-    "Usage:\tMake_kmer_tables.pl [options] --input file_list.txt\n";
+    "\nMake_kmer_tables.pl: A jellyfish wrapper for creating kmer tables for genome sequences.\n\n",
+    "Usage:\tMake_kmer_tables.pl [options] --input file_list.txt\n\n";
     foreach (@Options) {
         if (ref) {
             my $def = defined($_->{DEFAULT}) ? " [DEFAULT='$_->{DEFAULT}']" : "";
