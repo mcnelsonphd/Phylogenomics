@@ -9,10 +9,13 @@
 # NB: Uses jellyfish to actually count kmers due to its speed over doing so in pure perl.
 #     This must be present somewhere in the users PATH in order for script to work.
 #
+# Script skeleton and some tasty bits taken from prokka (https://github.com/tseemann/prokka)
+#
 # Created by: Michael C. Nelson
 # Version: 1
 # Created on: 2015-05-19
 # Revised on: 2015-05-19
+# License: GPL3
 ######################################################################################################
 
 use strict;
