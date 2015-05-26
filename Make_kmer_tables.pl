@@ -57,18 +57,15 @@ open LOG, '>', $logfile or err("Can't open logfile");
 msg("Began running Make_kmer_tables.pl at $starttime");
 msg("Will use maximum of $cpus cores.");
 msg("Writing log to: $logfile");
-
+msg("Using $input as the input file.");
 
 ###### ACTUAL WORK GETS DONE HERE ######
 
-if ($input == '') {
-    usage();
-}
 open(IN, $input) or msg("Could not open input file.\n");
-msg("Using $input as the input file.");
 
 while (<IN>) {
-    my @line = split(/\t/, $_);
+    chomp;
+    my @line = split(/\t/);
     my $genomeID = $line[0];
     my $genomeFP = $line[1];
     msg("Processing genome $genomeID using the file $genomeFP");
